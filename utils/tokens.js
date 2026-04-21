@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const RefreshToken = require("../models/refreshToken");
 
-const ACCESS_TTL = "15m";
+const ACCESS_TTL = "60m";
 const REFRESH_TTL_SEC = 60 * 60 * 24 * 7;
 
 function hashToken(token) {
@@ -14,7 +14,11 @@ function createJti() {
 }
 
 function signAccessToken(user) {
-  const payload = { id: user._id.toString(), email: user.email };
+  const payload = {
+    id: user._id.toString(),
+    email: user.email,
+    role: user.role,
+  };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: ACCESS_TTL });
 }
 
@@ -29,7 +33,7 @@ async function persistRefreshToken({ user, refreshToken, jti, ip, userAgent }) {
   const tokenHash = hashToken(refreshToken);
   const expiresAt = new Date(Date.now() + REFRESH_TTL_SEC * 1000);
   await RefreshToken.create({
-    user: user._id,
+    userId: user._id,
     tokenHash,
     jti,
     expiresAt,
@@ -51,7 +55,7 @@ function setRefreshCookie(res, refreshToken) {
 
 async function rotateRefreshToken(oldDoc, user, req, res) {
   // revoke old
-  oldDoc.revokedAt = new Date();
+  oldDoc.revoked = new Date();
   const newJti = createJti();
   oldDoc.replacedBy = newJti;
   await oldDoc.save();
