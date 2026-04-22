@@ -1,0 +1,86 @@
+const express = require("express");
+const auth = require("../middleware/auth");
+const authorizeRoles = require("../middleware/authorize");
+const Attendance = require("../models/attendance");
+const User = require("../models/user");
+
+const router = express.Router();
+
+router.use(auth);
+
+router.post("/", authorizeRoles("admin"), async (req, res) => {
+  try {
+    const { userId, date, checkIn, checkOut, status } = req.body;
+    if (!userId || !date || !checkIn || !checkOut || !status) {
+      return res
+        .status(400)
+        .json({ message: "userId, date, checkIn, checkOut and status are required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const attendance = await Attendance.create(req.body);
+    return res.status(201).json({ message: "Attendance created successfully", attendance });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+router.get("/", authorizeRoles("admin"), async (req, res) => {
+  try {
+    const attendanceRecords = await Attendance.find().populate("userId", "-password");
+    return res.json(attendanceRecords);
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+router.get("/me", authorizeRoles("employee", "admin"), async (req, res) => {
+  try {
+    const attendanceRecords = await Attendance.find({ userId: req.user.id }).sort({
+      date: -1,
+    });
+    return res.json(attendanceRecords);
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+router.get("/:id", authorizeRoles("admin"), async (req, res) => {
+  try {
+    const attendance = await Attendance.findById(req.params.id).populate(
+      "userId",
+      "-password",
+    );
+    if (!attendance) return res.status(404).json({ message: "Attendance not found" });
+    return res.json(attendance);
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+router.put("/:id", authorizeRoles("admin"), async (req, res) => {
+  try {
+    const attendance = await Attendance.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+    if (!attendance) return res.status(404).json({ message: "Attendance not found" });
+    return res.json({ message: "Attendance updated successfully", attendance });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+router.delete("/:id", authorizeRoles("admin"), async (req, res) => {
+  try {
+    const attendance = await Attendance.findByIdAndDelete(req.params.id);
+    if (!attendance) return res.status(404).json({ message: "Attendance not found" });
+    return res.json({ message: "Attendance deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+module.exports = router;

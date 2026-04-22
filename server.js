@@ -7,6 +7,10 @@ const profileRoutes = require("./routes/profile");
 const adminRoutes = require("./routes/admin");
 const employeeRoutes = require("./routes/employee");
 const departmentRoutes = require("./routes/department");
+const attendanceRoutes = require("./routes/attendance");
+const leaveRoutes = require("./routes/leave");
+const payrollRoutes = require("./routes/payroll");
+const announcementRoutes = require("./routes/announcement");
 
 const app = express();
 
@@ -27,6 +31,10 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/employee", employeeRoutes);
 app.use("/api/departments", departmentRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/leaves", leaveRoutes);
+app.use("/api/payroll", payrollRoutes);
+app.use("/api/announcements", announcementRoutes);
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
