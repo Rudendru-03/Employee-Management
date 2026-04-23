@@ -5,6 +5,7 @@ const User = require("../models/user");
 const RefreshToken = require("../models/refreshToken");
 const auth = require("../middleware/auth");
 const validate = require("../middleware/validate");
+const { authLimiter, loginLimiter } = require("../middleware/rateLimit");
 const {
   registerSchema,
   loginSchema,
@@ -22,7 +23,11 @@ const {
 
 const router = express.Router();
 
-router.post("/register", validate({ body: registerSchema }), async (req, res) => {
+router.post(
+  "/register",
+  authLimiter,
+  validate({ body: registerSchema }),
+  async (req, res) => {
   try {
     const { username, email, password, role = "employee", adminSecret } = req.body;
     const exitingUser = await User.findOne({ email });
@@ -53,7 +58,7 @@ router.post("/register", validate({ body: registerSchema }), async (req, res) =>
   }
 });
 
-router.post("/login", validate({ body: loginSchema }), async (req, res) => {
+router.post("/login", loginLimiter, validate({ body: loginSchema }), async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
@@ -93,6 +98,7 @@ router.post("/login", validate({ body: loginSchema }), async (req, res) => {
 
 router.post(
   "/change-password",
+  authLimiter,
   auth,
   validate({ body: changePasswordSchema }),
   async (req, res) => {
@@ -117,7 +123,7 @@ router.post(
   }
 });
 
-router.post("/refresh", async (req, res) => {
+router.post("/refresh", authLimiter, async (req, res) => {
   try {
     const token = req.cookies?.refresh_token;
     if (!token) return res.status(401).json({ message: "No refresh token" });
@@ -154,7 +160,7 @@ router.post("/refresh", async (req, res) => {
   }
 });
 
-router.post("/logout", async (req, res) => {
+router.post("/logout", authLimiter, async (req, res) => {
   try {
     const token = req.cookies?.refresh_token;
     if (token) {
