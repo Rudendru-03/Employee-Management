@@ -4,6 +4,12 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 const RefreshToken = require("../models/refreshToken");
 const auth = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const {
+  registerSchema,
+  loginSchema,
+  changePasswordSchema,
+} = require("../validations/auth.validation");
 const {
   createJti,
   signAccessToken,
@@ -16,7 +22,7 @@ const {
 
 const router = express.Router();
 
-router.post("/register", async (req, res) => {
+router.post("/register", validate({ body: registerSchema }), async (req, res) => {
   try {
     const { username, email, password, role = "employee", adminSecret } = req.body;
     const exitingUser = await User.findOne({ email });
@@ -47,7 +53,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", validate({ body: loginSchema }), async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
@@ -85,14 +91,13 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.post("/change-password", auth, async (req, res) => {
+router.post(
+  "/change-password",
+  auth,
+  validate({ body: changePasswordSchema }),
+  async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
-      return res
-        .status(400)
-        .json({ message: "currentPassword and newPassword are required" });
-    }
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });

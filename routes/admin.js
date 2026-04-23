@@ -2,23 +2,25 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const auth = require("../middleware/auth");
 const authorizeRoles = require("../middleware/authorize");
+const validate = require("../middleware/validate");
 const User = require("../models/user");
 const Employee = require("../models/employee");
 const Department = require("../models/department");
+const {
+  idParamSchema,
+  createUserSchema,
+  createEmployeeSchema,
+  updateEmployeeSchema,
+  updateUserStatusSchema,
+} = require("../validations/admin.validation");
 
 const router = express.Router();
 
 router.use(auth, authorizeRoles("admin"));
 
-router.post("/users", async (req, res) => {
+router.post("/users", validate({ body: createUserSchema }), async (req, res) => {
   try {
     const { username, email, password, role = "employee", status = "active" } = req.body;
-    if (!username || !email || !password) {
-      return res
-        .status(400)
-        .json({ message: "username, email and password are required" });
-    }
-
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
@@ -49,15 +51,9 @@ router.post("/users", async (req, res) => {
   }
 });
 
-router.post("/employees", async (req, res) => {
+router.post("/employees", validate({ body: createEmployeeSchema }), async (req, res) => {
   try {
     const { userId, employeeId, department, reportingManager } = req.body;
-    if (!userId || !employeeId || !department || !reportingManager) {
-      return res.status(400).json({
-        message: "userId, employeeId, department and reportingManager are required",
-      });
-    }
-
     const [user, departmentDoc, manager] = await Promise.all([
       User.findById(userId),
       Department.findById(department),
@@ -74,7 +70,10 @@ router.post("/employees", async (req, res) => {
   }
 });
 
-router.put("/employees/:id", async (req, res) => {
+router.put(
+  "/employees/:id",
+  validate({ params: idParamSchema, body: updateEmployeeSchema }),
+  async (req, res) => {
   try {
     const employee = await Employee.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
@@ -99,7 +98,7 @@ router.get("/employees", async (req, res) => {
   }
 });
 
-router.get("/employees/:id", async (req, res) => {
+router.get("/employees/:id", validate({ params: idParamSchema }), async (req, res) => {
   try {
     const employee = await Employee.findById(req.params.id)
       .populate("userId", "-password")
@@ -112,12 +111,12 @@ router.get("/employees/:id", async (req, res) => {
   }
 });
 
-router.patch("/users/:id/status", async (req, res) => {
+router.patch(
+  "/users/:id/status",
+  validate({ params: idParamSchema, body: updateUserStatusSchema }),
+  async (req, res) => {
   try {
     const { status } = req.body;
-    if (!["active", "inactive"].includes(status)) {
-      return res.status(400).json({ message: "Status must be active or inactive" });
-    }
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { status },

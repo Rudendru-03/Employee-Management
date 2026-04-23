@@ -1,21 +1,25 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const authorizeRoles = require("../middleware/authorize");
+const validate = require("../middleware/validate");
 const Leave = require("../models/leave");
+const {
+  idParamSchema,
+  applyLeaveSchema,
+  leaveStatusSchema,
+} = require("../validations/leave.validation");
 
 const router = express.Router();
 
 router.use(auth);
 
-router.post("/", authorizeRoles("employee", "admin"), async (req, res) => {
+router.post(
+  "/",
+  authorizeRoles("employee", "admin"),
+  validate({ body: applyLeaveSchema }),
+  async (req, res) => {
   try {
     const { leaveType, fromDate, toDate, reason } = req.body;
-    if (!leaveType || !fromDate || !toDate || !reason) {
-      return res
-        .status(400)
-        .json({ message: "leaveType, fromDate, toDate and reason are required" });
-    }
-
     const leave = await Leave.create({
       userId: req.user.id,
       leaveType,
@@ -53,7 +57,11 @@ router.get("/me", authorizeRoles("employee", "admin"), async (req, res) => {
   }
 });
 
-router.get("/:id", authorizeRoles("admin"), async (req, res) => {
+router.get(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema }),
+  async (req, res) => {
   try {
     const leave = await Leave.findById(req.params.id)
       .populate("userId", "-password")
@@ -65,14 +73,13 @@ router.get("/:id", authorizeRoles("admin"), async (req, res) => {
   }
 });
 
-router.patch("/:id/status", authorizeRoles("admin"), async (req, res) => {
+router.patch(
+  "/:id/status",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema, body: leaveStatusSchema }),
+  async (req, res) => {
   try {
     const { status } = req.body;
-    if (!["approved", "rejected", "pending"].includes(status)) {
-      return res
-        .status(400)
-        .json({ message: "Status must be approved, rejected or pending" });
-    }
 
     const leave = await Leave.findByIdAndUpdate(
       req.params.id,
@@ -89,7 +96,11 @@ router.patch("/:id/status", authorizeRoles("admin"), async (req, res) => {
   }
 });
 
-router.delete("/:id", authorizeRoles("admin"), async (req, res) => {
+router.delete(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema }),
+  async (req, res) => {
   try {
     const leave = await Leave.findByIdAndDelete(req.params.id);
     if (!leave) return res.status(404).json({ message: "Leave request not found" });

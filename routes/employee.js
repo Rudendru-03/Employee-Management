@@ -1,7 +1,9 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const authorizeRoles = require("../middleware/authorize");
+const validate = require("../middleware/validate");
 const Employee = require("../models/employee");
+const { updateMeSchema, updatePhotoSchema } = require("../validations/employee.validation");
 
 const router = express.Router();
 
@@ -20,31 +22,11 @@ router.get("/me", async (req, res) => {
   }
 });
 
-router.patch("/me", async (req, res) => {
+router.patch("/me", validate({ body: updateMeSchema }), async (req, res) => {
   try {
-    const allowedFields = [
-      "dateOfBirth",
-      "gender",
-      "phoneNumber",
-      "emergencyContact",
-      "photoUrl",
-      "documents",
-      "bankDetails",
-      "bankName",
-      "bankAccountNumber",
-      "bankAccountHolderName",
-      "bankAccountHolderAddress",
-      "workLocation",
-    ];
-
-    const updates = {};
-    Object.keys(req.body).forEach((key) => {
-      if (allowedFields.includes(key)) updates[key] = req.body[key];
-    });
-
     const employee = await Employee.findOneAndUpdate(
       { userId: req.user.id },
-      updates,
+      req.body,
       { new: true, runValidators: true },
     );
 
@@ -55,10 +37,9 @@ router.patch("/me", async (req, res) => {
   }
 });
 
-router.post("/me/photo", async (req, res) => {
+router.post("/me/photo", validate({ body: updatePhotoSchema }), async (req, res) => {
   try {
     const { photoUrl } = req.body;
-    if (!photoUrl) return res.status(400).json({ message: "photoUrl is required" });
 
     const employee = await Employee.findOneAndUpdate(
       { userId: req.user.id },

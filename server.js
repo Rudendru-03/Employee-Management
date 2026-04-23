@@ -1,6 +1,5 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
-require("dotenv").config();
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/auth");
 const profileRoutes = require("./routes/profile");
@@ -11,6 +10,7 @@ const attendanceRoutes = require("./routes/attendance");
 const leaveRoutes = require("./routes/leave");
 const payrollRoutes = require("./routes/payroll");
 const announcementRoutes = require("./routes/announcement");
+require("dotenv").config();
 
 const app = express();
 

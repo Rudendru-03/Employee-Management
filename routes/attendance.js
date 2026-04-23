@@ -1,22 +1,26 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const authorizeRoles = require("../middleware/authorize");
+const validate = require("../middleware/validate");
 const Attendance = require("../models/attendance");
 const User = require("../models/user");
+const {
+  idParamSchema,
+  createAttendanceSchema,
+  updateAttendanceSchema,
+} = require("../validations/attendance.validation");
 
 const router = express.Router();
 
 router.use(auth);
 
-router.post("/", authorizeRoles("admin"), async (req, res) => {
+router.post(
+  "/",
+  authorizeRoles("admin"),
+  validate({ body: createAttendanceSchema }),
+  async (req, res) => {
   try {
     const { userId, date, checkIn, checkOut, status } = req.body;
-    if (!userId || !date || !checkIn || !checkOut || !status) {
-      return res
-        .status(400)
-        .json({ message: "userId, date, checkIn, checkOut and status are required" });
-    }
-
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -47,7 +51,11 @@ router.get("/me", authorizeRoles("employee", "admin"), async (req, res) => {
   }
 });
 
-router.get("/:id", authorizeRoles("admin"), async (req, res) => {
+router.get(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema }),
+  async (req, res) => {
   try {
     const attendance = await Attendance.findById(req.params.id).populate(
       "userId",
@@ -60,7 +68,11 @@ router.get("/:id", authorizeRoles("admin"), async (req, res) => {
   }
 });
 
-router.put("/:id", authorizeRoles("admin"), async (req, res) => {
+router.put(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema, body: updateAttendanceSchema }),
+  async (req, res) => {
   try {
     const attendance = await Attendance.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
@@ -73,7 +85,11 @@ router.put("/:id", authorizeRoles("admin"), async (req, res) => {
   }
 });
 
-router.delete("/:id", authorizeRoles("admin"), async (req, res) => {
+router.delete(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema }),
+  async (req, res) => {
   try {
     const attendance = await Attendance.findByIdAndDelete(req.params.id);
     if (!attendance) return res.status(404).json({ message: "Attendance not found" });

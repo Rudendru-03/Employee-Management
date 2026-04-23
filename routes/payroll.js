@@ -1,20 +1,26 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const authorizeRoles = require("../middleware/authorize");
+const validate = require("../middleware/validate");
 const Payroll = require("../models/payroll");
 const User = require("../models/user");
+const {
+  idParamSchema,
+  createPayrollSchema,
+  updatePayrollSchema,
+} = require("../validations/payroll.validation");
 
 const router = express.Router();
 
 router.use(auth);
 
-router.post("/", authorizeRoles("admin"), async (req, res) => {
+router.post(
+  "/",
+  authorizeRoles("admin"),
+  validate({ body: createPayrollSchema }),
+  async (req, res) => {
   try {
     const { userId, month, basicSalary = 0, deductions = 0, bonus = 0 } = req.body;
-    if (!userId || !month) {
-      return res.status(400).json({ message: "userId and month are required" });
-    }
-
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -51,7 +57,11 @@ router.get("/me", authorizeRoles("employee", "admin"), async (req, res) => {
   }
 });
 
-router.get("/:id", authorizeRoles("admin"), async (req, res) => {
+router.get(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema }),
+  async (req, res) => {
   try {
     const payroll = await Payroll.findById(req.params.id).populate("userId", "-password");
     if (!payroll) return res.status(404).json({ message: "Payroll not found" });
@@ -61,7 +71,11 @@ router.get("/:id", authorizeRoles("admin"), async (req, res) => {
   }
 });
 
-router.put("/:id", authorizeRoles("admin"), async (req, res) => {
+router.put(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema, body: updatePayrollSchema }),
+  async (req, res) => {
   try {
     const { basicSalary, deductions, bonus } = req.body;
     const updates = { ...req.body };
@@ -90,7 +104,11 @@ router.put("/:id", authorizeRoles("admin"), async (req, res) => {
   }
 });
 
-router.delete("/:id", authorizeRoles("admin"), async (req, res) => {
+router.delete(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema }),
+  async (req, res) => {
   try {
     const payroll = await Payroll.findByIdAndDelete(req.params.id);
     if (!payroll) return res.status(404).json({ message: "Payroll not found" });

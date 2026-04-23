@@ -1,23 +1,23 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const authorizeRoles = require("../middleware/authorize");
+const validate = require("../middleware/validate");
 const Department = require("../models/department");
 const User = require("../models/user");
 const Employee = require("../models/employee");
+const {
+  idParamSchema,
+  createDepartmentSchema,
+  updateDepartmentSchema,
+} = require("../validations/department.validation");
 
 const router = express.Router();
 
 router.use(auth, authorizeRoles("admin"));
 
-router.post("/", async (req, res) => {
+router.post("/", validate({ body: createDepartmentSchema }), async (req, res) => {
   try {
     const { name, description, manager } = req.body;
-    if (!name || !description || !manager) {
-      return res
-        .status(400)
-        .json({ message: "name, description and manager are required" });
-    }
-
     const managerUser = await User.findById(manager);
     if (!managerUser) {
       return res.status(404).json({ message: "Manager user not found" });
@@ -42,7 +42,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", validate({ params: idParamSchema }), async (req, res) => {
   try {
     const department = await Department.findById(req.params.id).populate(
       "manager",
@@ -57,7 +57,10 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put(
+  "/:id",
+  validate({ params: idParamSchema, body: updateDepartmentSchema }),
+  async (req, res) => {
   try {
     const { manager } = req.body;
     if (manager) {
@@ -83,7 +86,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validate({ params: idParamSchema }), async (req, res) => {
   try {
     const employeesCount = await Employee.countDocuments({ department: req.params.id });
     if (employeesCount > 0) {

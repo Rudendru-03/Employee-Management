@@ -1,23 +1,27 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const authorizeRoles = require("../middleware/authorize");
+const validate = require("../middleware/validate");
 const Announcement = require("../models/announcement");
 const Department = require("../models/department");
 const Employee = require("../models/employee");
+const {
+  idParamSchema,
+  createAnnouncementSchema,
+  updateAnnouncementSchema,
+} = require("../validations/announcement.validation");
 
 const router = express.Router();
 
 router.use(auth);
 
-router.post("/", authorizeRoles("admin"), async (req, res) => {
+router.post(
+  "/",
+  authorizeRoles("admin"),
+  validate({ body: createAnnouncementSchema }),
+  async (req, res) => {
   try {
     const { title, description, target, department } = req.body;
-    if (!title || !description || !target) {
-      return res
-        .status(400)
-        .json({ message: "title, description and target are required" });
-    }
-
     if (target === "department") {
       if (!department) {
         return res
@@ -72,7 +76,11 @@ router.get("/me", authorizeRoles("employee", "admin"), async (req, res) => {
   }
 });
 
-router.get("/:id", authorizeRoles("admin"), async (req, res) => {
+router.get(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema }),
+  async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id)
       .populate("createdBy", "-password")
@@ -84,7 +92,11 @@ router.get("/:id", authorizeRoles("admin"), async (req, res) => {
   }
 });
 
-router.put("/:id", authorizeRoles("admin"), async (req, res) => {
+router.put(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema, body: updateAnnouncementSchema }),
+  async (req, res) => {
   try {
     const { target, department } = req.body;
     if (target === "department") {
@@ -111,7 +123,11 @@ router.put("/:id", authorizeRoles("admin"), async (req, res) => {
   }
 });
 
-router.delete("/:id", authorizeRoles("admin"), async (req, res) => {
+router.delete(
+  "/:id",
+  authorizeRoles("admin"),
+  validate({ params: idParamSchema }),
+  async (req, res) => {
   try {
     const announcement = await Announcement.findByIdAndDelete(req.params.id);
     if (!announcement) return res.status(404).json({ message: "Announcement not found" });
