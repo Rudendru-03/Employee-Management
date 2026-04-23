@@ -10,6 +10,7 @@ const attendanceRoutes = require("./routes/attendance");
 const leaveRoutes = require("./routes/leave");
 const payrollRoutes = require("./routes/payroll");
 const announcementRoutes = require("./routes/announcement");
+const { notFound, errorHandler } = require("./middleware/errorHandler");
 require("dotenv").config();
 
 const app = express();
@@ -35,6 +36,8 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/announcements", announcementRoutes);
+app.use(notFound);
+app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

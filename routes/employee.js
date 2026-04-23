@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.use(auth, authorizeRoles("employee", "admin"));
 
-router.get("/me", async (req, res) => {
+router.get("/me", async (req, res, next) => {
   try {
     const employee = await Employee.findOne({ userId: req.user.id })
       .populate("userId", "-password")
@@ -18,11 +18,11 @@ router.get("/me", async (req, res) => {
     if (!employee) return res.status(404).json({ message: "Employee profile not found" });
     return res.json(employee);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.patch("/me", validate({ body: updateMeSchema }), async (req, res) => {
+router.patch("/me", validate({ body: updateMeSchema }), async (req, res, next) => {
   try {
     const employee = await Employee.findOneAndUpdate(
       { userId: req.user.id },
@@ -33,11 +33,11 @@ router.patch("/me", validate({ body: updateMeSchema }), async (req, res) => {
     if (!employee) return res.status(404).json({ message: "Employee profile not found" });
     return res.json({ message: "Profile updated successfully", employee });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.post("/me/photo", validate({ body: updatePhotoSchema }), async (req, res) => {
+router.post("/me/photo", validate({ body: updatePhotoSchema }), async (req, res, next) => {
   try {
     const { photoUrl } = req.body;
 
@@ -49,7 +49,7 @@ router.post("/me/photo", validate({ body: updatePhotoSchema }), async (req, res)
     if (!employee) return res.status(404).json({ message: "Employee profile not found" });
     return res.json({ message: "Photo updated successfully", employee });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 

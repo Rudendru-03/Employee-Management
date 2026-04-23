@@ -18,7 +18,7 @@ router.post(
   "/",
   authorizeRoles("admin"),
   validate({ body: createPayrollSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const { userId, month, basicSalary = 0, deductions = 0, bonus = 0 } = req.body;
     const user = await User.findById(userId);
@@ -35,25 +35,25 @@ router.post(
     });
     return res.status(201).json({ message: "Payroll created successfully", payroll });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.get("/", authorizeRoles("admin"), async (req, res) => {
+router.get("/", authorizeRoles("admin"), async (req, res, next) => {
   try {
     const payrolls = await Payroll.find().populate("userId", "-password");
     return res.json(payrolls);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.get("/me", authorizeRoles("employee", "admin"), async (req, res) => {
+router.get("/me", authorizeRoles("employee", "admin"), async (req, res, next) => {
   try {
     const payrolls = await Payroll.find({ userId: req.user.id }).sort({ createdAt: -1 });
     return res.json(payrolls);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
@@ -61,13 +61,13 @@ router.get(
   "/:id",
   authorizeRoles("admin"),
   validate({ params: idParamSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const payroll = await Payroll.findById(req.params.id).populate("userId", "-password");
     if (!payroll) return res.status(404).json({ message: "Payroll not found" });
     return res.json(payroll);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
@@ -75,7 +75,7 @@ router.put(
   "/:id",
   authorizeRoles("admin"),
   validate({ params: idParamSchema, body: updatePayrollSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const { basicSalary, deductions, bonus } = req.body;
     const updates = { ...req.body };
@@ -100,7 +100,7 @@ router.put(
     if (!payroll) return res.status(404).json({ message: "Payroll not found" });
     return res.json({ message: "Payroll updated successfully", payroll });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
@@ -108,13 +108,13 @@ router.delete(
   "/:id",
   authorizeRoles("admin"),
   validate({ params: idParamSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const payroll = await Payroll.findByIdAndDelete(req.params.id);
     if (!payroll) return res.status(404).json({ message: "Payroll not found" });
     return res.json({ message: "Payroll deleted successfully" });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 

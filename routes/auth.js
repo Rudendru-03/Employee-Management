@@ -27,7 +27,7 @@ router.post(
   "/register",
   authLimiter,
   validate({ body: registerSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const { username, email, password, role = "employee", adminSecret } = req.body;
     const exitingUser = await User.findOne({ email });
@@ -54,11 +54,11 @@ router.post(
     await newUser.save();
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    next(error);
   }
 });
 
-router.post("/login", loginLimiter, validate({ body: loginSchema }), async (req, res) => {
+router.post("/login", loginLimiter, validate({ body: loginSchema }), async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
@@ -92,7 +92,7 @@ router.post("/login", loginLimiter, validate({ body: loginSchema }), async (req,
     res.json({ accessToken, mustChangePassword: user.mustChangePassword });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    next(error);
   }
 });
 
@@ -101,7 +101,7 @@ router.post(
   authLimiter,
   auth,
   validate({ body: changePasswordSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -119,11 +119,11 @@ router.post(
 
     return res.json({ message: "Password changed successfully" });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.post("/refresh", authLimiter, async (req, res) => {
+router.post("/refresh", authLimiter, async (req, res, next) => {
   try {
     const token = req.cookies?.refresh_token;
     if (!token) return res.status(401).json({ message: "No refresh token" });
@@ -156,11 +156,11 @@ router.post("/refresh", authLimiter, async (req, res) => {
     const result = await rotateRefreshToken(doc, doc.userId, req, res);
     return res.json({ accessToken: result.accessToken });
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    next(err);
   }
 });
 
-router.post("/logout", authLimiter, async (req, res) => {
+router.post("/logout", authLimiter, async (req, res, next) => {
   try {
     const token = req.cookies?.refresh_token;
     if (token) {
@@ -174,7 +174,7 @@ router.post("/logout", authLimiter, async (req, res) => {
     res.clearCookie("refresh_token", { path: "/api/auth/refresh" });
     res.json({ message: "Logged out" });
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    next(err);
   }
 });
 

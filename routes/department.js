@@ -15,7 +15,7 @@ const router = express.Router();
 
 router.use(auth, authorizeRoles("admin"));
 
-router.post("/", validate({ body: createDepartmentSchema }), async (req, res) => {
+router.post("/", validate({ body: createDepartmentSchema }), async (req, res, next) => {
   try {
     const { name, description, manager } = req.body;
     const managerUser = await User.findById(manager);
@@ -29,20 +29,20 @@ router.post("/", validate({ body: createDepartmentSchema }), async (req, res) =>
     if (error.code === 11000) {
       return res.status(400).json({ message: "Department name already exists" });
     }
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const departments = await Department.find().populate("manager", "-password");
     return res.json(departments);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.get("/:id", validate({ params: idParamSchema }), async (req, res) => {
+router.get("/:id", validate({ params: idParamSchema }), async (req, res, next) => {
   try {
     const department = await Department.findById(req.params.id).populate(
       "manager",
@@ -53,14 +53,14 @@ router.get("/:id", validate({ params: idParamSchema }), async (req, res) => {
     }
     return res.json(department);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
 router.put(
   "/:id",
   validate({ params: idParamSchema, body: updateDepartmentSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const { manager } = req.body;
     if (manager) {
@@ -82,11 +82,11 @@ router.put(
     if (error.code === 11000) {
       return res.status(400).json({ message: "Department name already exists" });
     }
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.delete("/:id", validate({ params: idParamSchema }), async (req, res) => {
+router.delete("/:id", validate({ params: idParamSchema }), async (req, res, next) => {
   try {
     const employeesCount = await Employee.countDocuments({ department: req.params.id });
     if (employeesCount > 0) {
@@ -101,7 +101,7 @@ router.delete("/:id", validate({ params: idParamSchema }), async (req, res) => {
     }
     return res.json({ message: "Department deleted successfully" });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 

@@ -17,7 +17,7 @@ router.post(
   "/",
   authorizeRoles("employee", "admin"),
   validate({ body: applyLeaveSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const { leaveType, fromDate, toDate, reason } = req.body;
     const leave = await Leave.create({
@@ -31,29 +31,29 @@ router.post(
 
     return res.status(201).json({ message: "Leave applied successfully", leave });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.get("/", authorizeRoles("admin"), async (req, res) => {
+router.get("/", authorizeRoles("admin"), async (req, res, next) => {
   try {
     const leaves = await Leave.find()
       .populate("userId", "-password")
       .populate("approvedBy", "-password");
     return res.json(leaves);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.get("/me", authorizeRoles("employee", "admin"), async (req, res) => {
+router.get("/me", authorizeRoles("employee", "admin"), async (req, res, next) => {
   try {
     const leaves = await Leave.find({ userId: req.user.id })
       .populate("approvedBy", "-password")
       .sort({ createdAt: -1 });
     return res.json(leaves);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
@@ -61,7 +61,7 @@ router.get(
   "/:id",
   authorizeRoles("admin"),
   validate({ params: idParamSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const leave = await Leave.findById(req.params.id)
       .populate("userId", "-password")
@@ -69,7 +69,7 @@ router.get(
     if (!leave) return res.status(404).json({ message: "Leave request not found" });
     return res.json(leave);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
@@ -77,7 +77,7 @@ router.patch(
   "/:id/status",
   authorizeRoles("admin"),
   validate({ params: idParamSchema, body: leaveStatusSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const { status } = req.body;
 
@@ -92,7 +92,7 @@ router.patch(
     if (!leave) return res.status(404).json({ message: "Leave request not found" });
     return res.json({ message: "Leave status updated successfully", leave });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
@@ -100,13 +100,13 @@ router.delete(
   "/:id",
   authorizeRoles("admin"),
   validate({ params: idParamSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const leave = await Leave.findByIdAndDelete(req.params.id);
     if (!leave) return res.status(404).json({ message: "Leave request not found" });
     return res.json({ message: "Leave request deleted successfully" });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 

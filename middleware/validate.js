@@ -28,7 +28,7 @@ function validate(schemas) {
           errors: formatZodError(error),
         });
       }
-      return res.status(500).json({ message: "Internal Server Error" });
+      return next(error);
     }
   };
 }

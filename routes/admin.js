@@ -18,7 +18,7 @@ const router = express.Router();
 
 router.use(auth, authorizeRoles("admin"));
 
-router.post("/users", validate({ body: createUserSchema }), async (req, res) => {
+router.post("/users", validate({ body: createUserSchema }), async (req, res, next) => {
   try {
     const { username, email, password, role = "employee", status = "active" } = req.body;
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -47,11 +47,11 @@ router.post("/users", validate({ body: createUserSchema }), async (req, res) => 
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.post("/employees", validate({ body: createEmployeeSchema }), async (req, res) => {
+router.post("/employees", validate({ body: createEmployeeSchema }), async (req, res, next) => {
   try {
     const { userId, employeeId, department, reportingManager } = req.body;
     const [user, departmentDoc, manager] = await Promise.all([
@@ -66,14 +66,14 @@ router.post("/employees", validate({ body: createEmployeeSchema }), async (req, 
     const employee = await Employee.create(req.body);
     return res.status(201).json({ message: "Employee created successfully", employee });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
 router.put(
   "/employees/:id",
   validate({ params: idParamSchema, body: updateEmployeeSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const employee = await Employee.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
@@ -82,11 +82,11 @@ router.put(
     if (!employee) return res.status(404).json({ message: "Employee not found" });
     return res.json({ message: "Employee updated successfully", employee });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.get("/employees", async (req, res) => {
+router.get("/employees", async (req, res, next) => {
   try {
     const employees = await Employee.find()
       .populate("userId", "-password")
@@ -94,11 +94,11 @@ router.get("/employees", async (req, res) => {
       .populate("reportingManager", "-password");
     return res.json(employees);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.get("/employees/:id", validate({ params: idParamSchema }), async (req, res) => {
+router.get("/employees/:id", validate({ params: idParamSchema }), async (req, res, next) => {
   try {
     const employee = await Employee.findById(req.params.id)
       .populate("userId", "-password")
@@ -107,14 +107,14 @@ router.get("/employees/:id", validate({ params: idParamSchema }), async (req, re
     if (!employee) return res.status(404).json({ message: "Employee not found" });
     return res.json(employee);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
 router.patch(
   "/users/:id/status",
   validate({ params: idParamSchema, body: updateUserStatusSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const { status } = req.body;
     const user = await User.findByIdAndUpdate(
@@ -125,7 +125,7 @@ router.patch(
     if (!user) return res.status(404).json({ message: "User not found" });
     return res.json({ message: "User status updated", user });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 

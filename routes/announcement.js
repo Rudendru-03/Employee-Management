@@ -19,7 +19,7 @@ router.post(
   "/",
   authorizeRoles("admin"),
   validate({ body: createAnnouncementSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const { title, description, target, department } = req.body;
     if (target === "department") {
@@ -40,22 +40,22 @@ router.post(
       .status(201)
       .json({ message: "Announcement created successfully", announcement });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.get("/", authorizeRoles("admin"), async (req, res) => {
+router.get("/", authorizeRoles("admin"), async (req, res, next) => {
   try {
     const announcements = await Announcement.find()
       .populate("createdBy", "-password")
       .populate("department");
     return res.json(announcements);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
-router.get("/me", authorizeRoles("employee", "admin"), async (req, res) => {
+router.get("/me", authorizeRoles("employee", "admin"), async (req, res, next) => {
   try {
     const employee = await Employee.findOne({ userId: req.user.id }).select("department");
     const departmentId = employee?.department || null;
@@ -72,7 +72,7 @@ router.get("/me", authorizeRoles("employee", "admin"), async (req, res) => {
 
     return res.json(announcements);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
@@ -80,7 +80,7 @@ router.get(
   "/:id",
   authorizeRoles("admin"),
   validate({ params: idParamSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const announcement = await Announcement.findById(req.params.id)
       .populate("createdBy", "-password")
@@ -88,7 +88,7 @@ router.get(
     if (!announcement) return res.status(404).json({ message: "Announcement not found" });
     return res.json(announcement);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
@@ -96,7 +96,7 @@ router.put(
   "/:id",
   authorizeRoles("admin"),
   validate({ params: idParamSchema, body: updateAnnouncementSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const { target, department } = req.body;
     if (target === "department") {
@@ -119,7 +119,7 @@ router.put(
     if (!announcement) return res.status(404).json({ message: "Announcement not found" });
     return res.json({ message: "Announcement updated successfully", announcement });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
@@ -127,13 +127,13 @@ router.delete(
   "/:id",
   authorizeRoles("admin"),
   validate({ params: idParamSchema }),
-  async (req, res) => {
+  async (req, res, next) => {
   try {
     const announcement = await Announcement.findByIdAndDelete(req.params.id);
     if (!announcement) return res.status(404).json({ message: "Announcement not found" });
     return res.json({ message: "Announcement deleted successfully" });
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    return next(error);
   }
 });
 
