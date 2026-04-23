@@ -5,6 +5,13 @@ const validate = require("../middleware/validate");
 const Announcement = require("../models/announcement");
 const Department = require("../models/department");
 const Employee = require("../models/employee");
+const { z } = require("../validations/common");
+const { paginationQuerySchema } = require("../validations/pagination.validation");
+const {
+  parsePagination,
+  buildEqualityFilter,
+  buildPaginatedResult,
+} = require("../utils/pagination");
 const {
   idParamSchema,
   createAnnouncementSchema,
@@ -12,6 +19,16 @@ const {
 } = require("../validations/announcement.validation");
 
 const router = express.Router();
+const announcementListQuerySchema = paginationQuerySchema.extend({
+  title: z.string().optional(),
+  target: z.enum(["all", "department", "employee"]).optional(),
+  department: z.string().optional(),
+  createdBy: z.string().optional(),
+});
+const announcementMeQuerySchema = paginationQuerySchema.extend({
+  title: z.string().optional(),
+  target: z.enum(["all", "department", "employee"]).optional(),
+});
 
 router.use(auth);
 
@@ -44,33 +61,69 @@ router.post(
   }
 });
 
-router.get("/", authorizeRoles("admin"), async (req, res, next) => {
+router.get(
+  "/",
+  authorizeRoles("admin"),
+  validate({ query: announcementListQuerySchema }),
+  async (req, res, next) => {
   try {
-    const announcements = await Announcement.find()
-      .populate("createdBy", "-password")
-      .populate("department");
-    return res.json(announcements);
+    const { limit, offset } = parsePagination(req.query);
+    const filter = buildEqualityFilter(req.query, [
+      "title",
+      "target",
+      "department",
+      "createdBy",
+    ]);
+    const [announcements, total] = await Promise.all([
+      Announcement.find(filter)
+        .skip(offset)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .populate("createdBy", "-password")
+        .populate("department"),
+      Announcement.countDocuments(filter),
+    ]);
+    return res.json(
+      buildPaginatedResult({
+        items: announcements,
+        total,
+        limit,
+        offset,
+      }),
+    );
   } catch (error) {
     return next(error);
   }
 });
 
-router.get("/me", authorizeRoles("employee", "admin"), async (req, res, next) => {
+router.get(
+  "/me",
+  authorizeRoles("employee", "admin"),
+  validate({ query: announcementMeQuerySchema }),
+  async (req, res, next) => {
   try {
+    const { limit, offset } = parsePagination(req.query);
     const employee = await Employee.findOne({ userId: req.user.id }).select("department");
     const departmentId = employee?.department || null;
-
-    const announcements = await Announcement.find({
+    const visibilityFilter = {
       $or: [
         { target: "all" },
         { target: "employee" },
         ...(departmentId ? [{ target: "department", department: departmentId }] : []),
       ],
-    })
-      .populate("createdBy", "-password")
-      .populate("department");
-
-    return res.json(announcements);
+    };
+    const extraFilter = buildEqualityFilter(req.query, ["title", "target"]);
+    const finalFilter = { ...visibilityFilter, ...extraFilter };
+    const [announcements, total] = await Promise.all([
+      Announcement.find(finalFilter)
+        .skip(offset)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .populate("createdBy", "-password")
+        .populate("department"),
+      Announcement.countDocuments(finalFilter),
+    ]);
+    return res.json(buildPaginatedResult({ items: announcements, total, limit, offset }));
   } catch (error) {
     return next(error);
   }

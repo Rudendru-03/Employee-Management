@@ -3,6 +3,13 @@ const auth = require("../middleware/auth");
 const authorizeRoles = require("../middleware/authorize");
 const validate = require("../middleware/validate");
 const Leave = require("../models/leave");
+const { z } = require("../validations/common");
+const { paginationQuerySchema } = require("../validations/pagination.validation");
+const {
+  parsePagination,
+  buildEqualityFilter,
+  buildPaginatedResult,
+} = require("../utils/pagination");
 const {
   idParamSchema,
   applyLeaveSchema,
@@ -10,6 +17,15 @@ const {
 } = require("../validations/leave.validation");
 
 const router = express.Router();
+const leaveListQuerySchema = paginationQuerySchema.extend({
+  userId: z.string().optional(),
+  leaveType: z.enum(["sick", "casual", "paid"]).optional(),
+  status: z.enum(["pending", "approved", "rejected"]).optional(),
+});
+const leaveMeQuerySchema = paginationQuerySchema.extend({
+  leaveType: z.enum(["sick", "casual", "paid"]).optional(),
+  status: z.enum(["pending", "approved", "rejected"]).optional(),
+});
 
 router.use(auth);
 
@@ -35,23 +51,49 @@ router.post(
   }
 });
 
-router.get("/", authorizeRoles("admin"), async (req, res, next) => {
+router.get(
+  "/",
+  authorizeRoles("admin"),
+  validate({ query: leaveListQuerySchema }),
+  async (req, res, next) => {
   try {
-    const leaves = await Leave.find()
-      .populate("userId", "-password")
-      .populate("approvedBy", "-password");
-    return res.json(leaves);
+    const { limit, offset } = parsePagination(req.query);
+    const filter = buildEqualityFilter(req.query, ["userId", "leaveType", "status"]);
+    const [leaves, total] = await Promise.all([
+      Leave.find(filter)
+        .skip(offset)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .populate("userId", "-password")
+        .populate("approvedBy", "-password"),
+      Leave.countDocuments(filter),
+    ]);
+    return res.json(buildPaginatedResult({ items: leaves, total, limit, offset }));
   } catch (error) {
     return next(error);
   }
 });
 
-router.get("/me", authorizeRoles("employee", "admin"), async (req, res, next) => {
+router.get(
+  "/me",
+  authorizeRoles("employee", "admin"),
+  validate({ query: leaveMeQuerySchema }),
+  async (req, res, next) => {
   try {
-    const leaves = await Leave.find({ userId: req.user.id })
-      .populate("approvedBy", "-password")
-      .sort({ createdAt: -1 });
-    return res.json(leaves);
+    const { limit, offset } = parsePagination(req.query);
+    const filter = {
+      userId: req.user.id,
+      ...buildEqualityFilter(req.query, ["leaveType", "status"]),
+    };
+    const [leaves, total] = await Promise.all([
+      Leave.find(filter)
+        .skip(offset)
+        .limit(limit)
+        .populate("approvedBy", "-password")
+        .sort({ createdAt: -1 }),
+      Leave.countDocuments(filter),
+    ]);
+    return res.json(buildPaginatedResult({ items: leaves, total, limit, offset }));
   } catch (error) {
     return next(error);
   }

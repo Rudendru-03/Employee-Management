@@ -6,6 +6,13 @@ const validate = require("../middleware/validate");
 const User = require("../models/user");
 const Employee = require("../models/employee");
 const Department = require("../models/department");
+const { z } = require("../validations/common");
+const { paginationQuerySchema } = require("../validations/pagination.validation");
+const {
+  parsePagination,
+  buildEqualityFilter,
+  buildPaginatedResult,
+} = require("../utils/pagination");
 const {
   idParamSchema,
   createUserSchema,
@@ -15,6 +22,15 @@ const {
 } = require("../validations/admin.validation");
 
 const router = express.Router();
+const employeeListQuerySchema = paginationQuerySchema.extend({
+  userId: z.string().optional(),
+  employeeId: z.string().optional(),
+  department: z.string().optional(),
+  reportingManager: z.string().optional(),
+  employmentType: z.string().optional(),
+  workLocation: z.string().optional(),
+  gender: z.string().optional(),
+});
 
 router.use(auth, authorizeRoles("admin"));
 
@@ -86,13 +102,39 @@ router.put(
   }
 });
 
-router.get("/employees", async (req, res, next) => {
+router.get(
+  "/employees",
+  validate({ query: employeeListQuerySchema }),
+  async (req, res, next) => {
   try {
-    const employees = await Employee.find()
-      .populate("userId", "-password")
-      .populate("department")
-      .populate("reportingManager", "-password");
-    return res.json(employees);
+    const { limit, offset } = parsePagination(req.query);
+    const filter = buildEqualityFilter(req.query, [
+      "userId",
+      "employeeId",
+      "department",
+      "reportingManager",
+      "employmentType",
+      "workLocation",
+      "gender",
+    ]);
+    const [employees, total] = await Promise.all([
+      Employee.find(filter)
+        .skip(offset)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .populate("userId", "-password")
+        .populate("department")
+        .populate("reportingManager", "-password"),
+      Employee.countDocuments(filter),
+    ]);
+    return res.json(
+      buildPaginatedResult({
+        items: employees,
+        total,
+        limit,
+        offset,
+      }),
+    );
   } catch (error) {
     return next(error);
   }

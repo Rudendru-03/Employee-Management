@@ -4,6 +4,13 @@ const authorizeRoles = require("../middleware/authorize");
 const validate = require("../middleware/validate");
 const Payroll = require("../models/payroll");
 const User = require("../models/user");
+const { z } = require("../validations/common");
+const { paginationQuerySchema } = require("../validations/pagination.validation");
+const {
+  parsePagination,
+  buildEqualityFilter,
+  buildPaginatedResult,
+} = require("../utils/pagination");
 const {
   idParamSchema,
   createPayrollSchema,
@@ -11,6 +18,13 @@ const {
 } = require("../validations/payroll.validation");
 
 const router = express.Router();
+const payrollListQuerySchema = paginationQuerySchema.extend({
+  userId: z.string().optional(),
+  month: z.string().optional(),
+});
+const payrollMeQuerySchema = paginationQuerySchema.extend({
+  month: z.string().optional(),
+});
 
 router.use(auth);
 
@@ -39,19 +53,44 @@ router.post(
   }
 });
 
-router.get("/", authorizeRoles("admin"), async (req, res, next) => {
+router.get(
+  "/",
+  authorizeRoles("admin"),
+  validate({ query: payrollListQuerySchema }),
+  async (req, res, next) => {
   try {
-    const payrolls = await Payroll.find().populate("userId", "-password");
-    return res.json(payrolls);
+    const { limit, offset } = parsePagination(req.query);
+    const filter = buildEqualityFilter(req.query, ["userId", "month"]);
+    const [payrolls, total] = await Promise.all([
+      Payroll.find(filter)
+        .skip(offset)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .populate("userId", "-password"),
+      Payroll.countDocuments(filter),
+    ]);
+    return res.json(buildPaginatedResult({ items: payrolls, total, limit, offset }));
   } catch (error) {
     return next(error);
   }
 });
 
-router.get("/me", authorizeRoles("employee", "admin"), async (req, res, next) => {
+router.get(
+  "/me",
+  authorizeRoles("employee", "admin"),
+  validate({ query: payrollMeQuerySchema }),
+  async (req, res, next) => {
   try {
-    const payrolls = await Payroll.find({ userId: req.user.id }).sort({ createdAt: -1 });
-    return res.json(payrolls);
+    const { limit, offset } = parsePagination(req.query);
+    const filter = {
+      userId: req.user.id,
+      ...buildEqualityFilter(req.query, ["month"]),
+    };
+    const [payrolls, total] = await Promise.all([
+      Payroll.find(filter).skip(offset).limit(limit).sort({ createdAt: -1 }),
+      Payroll.countDocuments(filter),
+    ]);
+    return res.json(buildPaginatedResult({ items: payrolls, total, limit, offset }));
   } catch (error) {
     return next(error);
   }

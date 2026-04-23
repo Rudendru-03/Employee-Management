@@ -4,6 +4,13 @@ const authorizeRoles = require("../middleware/authorize");
 const validate = require("../middleware/validate");
 const Attendance = require("../models/attendance");
 const User = require("../models/user");
+const { z } = require("../validations/common");
+const { paginationQuerySchema } = require("../validations/pagination.validation");
+const {
+  parsePagination,
+  buildEqualityFilter,
+  buildPaginatedResult,
+} = require("../utils/pagination");
 const {
   idParamSchema,
   createAttendanceSchema,
@@ -11,6 +18,15 @@ const {
 } = require("../validations/attendance.validation");
 
 const router = express.Router();
+const attendanceListQuerySchema = paginationQuerySchema.extend({
+  userId: z.string().optional(),
+  status: z.enum(["present", "absent", "leave", "holiday"]).optional(),
+  date: z.string().optional(),
+});
+const attendanceMeQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(["present", "absent", "leave", "holiday"]).optional(),
+  date: z.string().optional(),
+});
 
 router.use(auth);
 
@@ -31,21 +47,58 @@ router.post(
   }
 });
 
-router.get("/", authorizeRoles("admin"), async (req, res, next) => {
+router.get(
+  "/",
+  authorizeRoles("admin"),
+  validate({ query: attendanceListQuerySchema }),
+  async (req, res, next) => {
   try {
-    const attendanceRecords = await Attendance.find().populate("userId", "-password");
-    return res.json(attendanceRecords);
+    const { limit, offset } = parsePagination(req.query);
+    const filter = buildEqualityFilter(req.query, ["userId", "status", "date"]);
+    const [attendanceRecords, total] = await Promise.all([
+      Attendance.find(filter)
+        .skip(offset)
+        .limit(limit)
+        .sort({ date: -1 })
+        .populate("userId", "-password"),
+      Attendance.countDocuments(filter),
+    ]);
+    return res.json(
+      buildPaginatedResult({
+        items: attendanceRecords,
+        total,
+        limit,
+        offset,
+      }),
+    );
   } catch (error) {
     return next(error);
   }
 });
 
-router.get("/me", authorizeRoles("employee", "admin"), async (req, res, next) => {
+router.get(
+  "/me",
+  authorizeRoles("employee", "admin"),
+  validate({ query: attendanceMeQuerySchema }),
+  async (req, res, next) => {
   try {
-    const attendanceRecords = await Attendance.find({ userId: req.user.id }).sort({
-      date: -1,
-    });
-    return res.json(attendanceRecords);
+    const { limit, offset } = parsePagination(req.query);
+    const filter = {
+      userId: req.user.id,
+      ...buildEqualityFilter(req.query, ["status", "date"]),
+    };
+    const [attendanceRecords, total] = await Promise.all([
+      Attendance.find(filter).skip(offset).limit(limit).sort({ date: -1 }),
+      Attendance.countDocuments(filter),
+    ]);
+    return res.json(
+      buildPaginatedResult({
+        items: attendanceRecords,
+        total,
+        limit,
+        offset,
+      }),
+    );
   } catch (error) {
     return next(error);
   }

@@ -5,6 +5,13 @@ const validate = require("../middleware/validate");
 const Department = require("../models/department");
 const User = require("../models/user");
 const Employee = require("../models/employee");
+const { z } = require("../validations/common");
+const { paginationQuerySchema } = require("../validations/pagination.validation");
+const {
+  parsePagination,
+  buildEqualityFilter,
+  buildPaginatedResult,
+} = require("../utils/pagination");
 const {
   idParamSchema,
   createDepartmentSchema,
@@ -12,6 +19,10 @@ const {
 } = require("../validations/department.validation");
 
 const router = express.Router();
+const departmentListQuerySchema = paginationQuerySchema.extend({
+  name: z.string().optional(),
+  manager: z.string().optional(),
+});
 
 router.use(auth, authorizeRoles("admin"));
 
@@ -33,10 +44,19 @@ router.post("/", validate({ body: createDepartmentSchema }), async (req, res, ne
   }
 });
 
-router.get("/", async (req, res, next) => {
+router.get("/", validate({ query: departmentListQuerySchema }), async (req, res, next) => {
   try {
-    const departments = await Department.find().populate("manager", "-password");
-    return res.json(departments);
+    const { limit, offset } = parsePagination(req.query);
+    const filter = buildEqualityFilter(req.query, ["name", "manager"]);
+    const [departments, total] = await Promise.all([
+      Department.find(filter)
+        .skip(offset)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .populate("manager", "-password"),
+      Department.countDocuments(filter),
+    ]);
+    return res.json(buildPaginatedResult({ items: departments, total, limit, offset }));
   } catch (error) {
     return next(error);
   }
