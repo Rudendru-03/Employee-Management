@@ -7,7 +7,9 @@ const User = require("../models/user");
 const Employee = require("../models/employee");
 const Department = require("../models/department");
 const { z } = require("../validations/common");
-const { paginationQuerySchema } = require("../validations/pagination.validation");
+const {
+  paginationQuerySchema,
+} = require("../validations/pagination.validation");
 const {
   parsePagination,
   buildEqualityFilter,
@@ -32,143 +34,229 @@ const employeeListQuerySchema = paginationQuerySchema.extend({
   gender: z.string().optional(),
 });
 
+const userListQuerySchema = paginationQuerySchema.extend({
+  username: z.string().optional(),
+  email: z.string().optional(),
+  role: z.enum(["admin", "employee"]).optional(),
+  status: z.enum(["active", "inactive"]).optional(),
+  mustChangePassword: z
+    .union([z.boolean(), z.string()])
+    .optional()
+    .transform((val) => {
+      if (val === "true") return true;
+      if (val === "false") return false;
+      return val;
+    }),
+});
+
 router.use(auth, authorizeRoles("admin"));
 
-router.post("/users", validate({ body: createUserSchema }), async (req, res, next) => {
-  try {
-    const { username, email, password, role = "employee", status = "active" } = req.body;
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+router.get(
+  "/users",
+  validate({ query: userListQuerySchema }),
+  async (req, res, next) => {
+    try {
+      const { limit, offset } = parsePagination(req.query);
+
+      const filter = buildEqualityFilter(req.query, [
+        "username",
+        "email",
+        "role",
+        "status",
+        "mustChangePassword",
+      ]);
+
+      const [users, total] = await Promise.all([
+        User.find(filter)
+          .skip(offset)
+          .limit(limit)
+          .sort({ createdAt: -1 })
+          .select("-password"), // important: never expose password
+        User.countDocuments(filter),
+      ]);
+
+      return res.json(
+        buildPaginatedResult({
+          items: users,
+          total,
+          limit,
+          offset,
+        }),
+      );
+    } catch (error) {
+      return next(error);
     }
+  },
+);
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({
-      username,
-      email,
-      password: hashedPassword,
-      role,
-      status,
-      mustChangePassword: true,
-    });
+router.post(
+  "/users",
+  validate({ body: createUserSchema }),
+  async (req, res, next) => {
+    try {
+      const {
+        username,
+        email,
+        password,
+        role = "employee",
+        status = "active",
+      } = req.body;
+      const existingUser = await User.findOne({
+        $or: [{ email }, { username }],
+      });
+      if (existingUser) {
+        return res.status(400).json({ message: "User already exists" });
+      }
 
-    return res.status(201).json({
-      message: "User created successfully",
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-      },
-    });
-  } catch (error) {
-    return next(error);
-  }
-});
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await User.create({
+        username,
+        email,
+        password: hashedPassword,
+        role,
+        status,
+        mustChangePassword: true,
+      });
 
-router.post("/employees", validate({ body: createEmployeeSchema }), async (req, res, next) => {
-  try {
-    const { userId, employeeId, department, reportingManager } = req.body;
-    const [user, departmentDoc, manager] = await Promise.all([
-      User.findById(userId),
-      Department.findById(department),
-      User.findById(reportingManager),
-    ]);
-    if (!user) return res.status(404).json({ message: "User not found" });
-    if (!departmentDoc) return res.status(404).json({ message: "Department not found" });
-    if (!manager) return res.status(404).json({ message: "Reporting manager not found" });
+      return res.status(201).json({
+        message: "User created successfully",
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          status: user.status,
+        },
+      });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
-    const employee = await Employee.create(req.body);
-    return res.status(201).json({ message: "Employee created successfully", employee });
-  } catch (error) {
-    return next(error);
-  }
-});
+router.post(
+  "/employees",
+  validate({ body: createEmployeeSchema }),
+  async (req, res, next) => {
+    try {
+      const { userId, employeeId, department, reportingManager } = req.body;
+      const [user, departmentDoc, manager] = await Promise.all([
+        User.findById(userId),
+        Department.findById(department),
+        User.findById(reportingManager),
+      ]);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      if (!departmentDoc)
+        return res.status(404).json({ message: "Department not found" });
+      if (!manager)
+        return res.status(404).json({ message: "Reporting manager not found" });
+
+      const employee = await Employee.create(req.body);
+      return res
+        .status(201)
+        .json({ message: "Employee created successfully", employee });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 router.put(
   "/employees/:id",
   validate({ params: idParamSchema, body: updateEmployeeSchema }),
   async (req, res, next) => {
-  try {
-    const employee = await Employee.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
-    if (!employee) return res.status(404).json({ message: "Employee not found" });
-    return res.json({ message: "Employee updated successfully", employee });
-  } catch (error) {
-    return next(error);
-  }
-});
+    try {
+      const employee = await Employee.findByIdAndUpdate(
+        req.params.id,
+        req.body,
+        {
+          new: true,
+          runValidators: true,
+        },
+      );
+      if (!employee)
+        return res.status(404).json({ message: "Employee not found" });
+      return res.json({ message: "Employee updated successfully", employee });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 router.get(
   "/employees",
   validate({ query: employeeListQuerySchema }),
   async (req, res, next) => {
-  try {
-    const { limit, offset } = parsePagination(req.query);
-    const filter = buildEqualityFilter(req.query, [
-      "userId",
-      "employeeId",
-      "department",
-      "reportingManager",
-      "employmentType",
-      "workLocation",
-      "gender",
-    ]);
-    const [employees, total] = await Promise.all([
-      Employee.find(filter)
-        .skip(offset)
-        .limit(limit)
-        .sort({ createdAt: -1 })
+    try {
+      const { limit, offset } = parsePagination(req.query);
+      const filter = buildEqualityFilter(req.query, [
+        "userId",
+        "employeeId",
+        "department",
+        "reportingManager",
+        "employmentType",
+        "workLocation",
+        "gender",
+      ]);
+      const [employees, total] = await Promise.all([
+        Employee.find(filter)
+          .skip(offset)
+          .limit(limit)
+          .sort({ createdAt: -1 })
+          .populate("userId", "-password")
+          .populate("department")
+          .populate("reportingManager", "-password"),
+        Employee.countDocuments(filter),
+      ]);
+      return res.json(
+        buildPaginatedResult({
+          items: employees,
+          total,
+          limit,
+          offset,
+        }),
+      );
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+router.get(
+  "/employees/:id",
+  validate({ params: idParamSchema }),
+  async (req, res, next) => {
+    try {
+      const employee = await Employee.findById(req.params.id)
         .populate("userId", "-password")
         .populate("department")
-        .populate("reportingManager", "-password"),
-      Employee.countDocuments(filter),
-    ]);
-    return res.json(
-      buildPaginatedResult({
-        items: employees,
-        total,
-        limit,
-        offset,
-      }),
-    );
-  } catch (error) {
-    return next(error);
-  }
-});
-
-router.get("/employees/:id", validate({ params: idParamSchema }), async (req, res, next) => {
-  try {
-    const employee = await Employee.findById(req.params.id)
-      .populate("userId", "-password")
-      .populate("department")
-      .populate("reportingManager", "-password");
-    if (!employee) return res.status(404).json({ message: "Employee not found" });
-    return res.json(employee);
-  } catch (error) {
-    return next(error);
-  }
-});
+        .populate("reportingManager", "-password");
+      if (!employee)
+        return res.status(404).json({ message: "Employee not found" });
+      return res.json(employee);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 router.patch(
   "/users/:id/status",
   validate({ params: idParamSchema, body: updateUserStatusSchema }),
   async (req, res, next) => {
-  try {
-    const { status } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true, runValidators: true },
-    ).select("-password");
-    if (!user) return res.status(404).json({ message: "User not found" });
-    return res.json({ message: "User status updated", user });
-  } catch (error) {
-    return next(error);
-  }
-});
+    try {
+      const { status } = req.body;
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        { status },
+        { new: true, runValidators: true },
+      ).select("-password");
+      if (!user) return res.status(404).json({ message: "User not found" });
+      return res.json({ message: "User status updated", user });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 module.exports = router;
