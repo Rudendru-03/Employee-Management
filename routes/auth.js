@@ -6,6 +6,7 @@ const RefreshToken = require("../models/refreshToken");
 const auth = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const { authLimiter, loginLimiter } = require("../middleware/rateLimit");
+const logger = require("../utils/logger");
 const {
   registerSchema,
   loginSchema,
@@ -62,13 +63,36 @@ router.post("/login", loginLimiter, validate({ body: loginSchema }), async (req,
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user)
+    if (!user) {
+      logger.warn("Invalid login attempt", {
+        email,
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+        reason: "User not found",
+      });
       return res.status(400).json({ message: "Invalid email or password" });
+    }
     if (user.status !== "active") {
+      logger.warn("Blocked login attempt", {
+        userId: user._id.toString(),
+        email: user.email,
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+        reason: "Inactive account",
+      });
       return res.status(403).json({ message: "User account is inactive" });
     }
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid password" });
+    if (!isMatch) {
+      logger.warn("Invalid login attempt", {
+        userId: user._id?.toString(),
+        email: user.email,
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+        reason: "Invalid password",
+      });
+      return res.status(400).json({ message: "Invalid password" });
+    }
 
     const accessToken = signAccessToken(user);
     const jti = createJti();
@@ -85,13 +109,22 @@ router.post("/login", loginLimiter, validate({ body: loginSchema }), async (req,
     user.lastLoginAt = new Date();
     await user.save();
 
-    // const payload = { id: user._id, email: user.email };
-    // const token = jwt.sign(payload, process.env.JWT_SECRET, {
-    //   expiresIn: "15m",
-    // });
+    logger.info("User logged in", {
+      userId: user._id.toString(),
+      email: user.email,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
     res.json({ accessToken, mustChangePassword: user.mustChangePassword });
   } catch (error) {
-    console.error("Login error:", error);
+    logger.error("Login error", {
+      message: error.message,
+      stack: error.stack,
+      path: req.originalUrl,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
     next(error);
   }
 });

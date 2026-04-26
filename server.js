@@ -11,6 +11,7 @@ const leaveRoutes = require("./routes/leave");
 const payrollRoutes = require("./routes/payroll");
 const announcementRoutes = require("./routes/announcement");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
+const logger = require("./utils/logger");
 require("dotenv").config();
 
 const app = express();
@@ -66,5 +67,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server is running on the port ${PORT}`);
+  logger.info(`Server is running on port ${PORT}`, {
+    environment: process.env.NODE_ENV || "development",
+  });
 });
