@@ -5,6 +5,7 @@ const validate = require("../middleware/validate");
 const Announcement = require("../models/announcement");
 const Department = require("../models/department");
 const Employee = require("../models/employee");
+const { sendAnnouncementNotifications } = require("../services/notificationService");
 const { z } = require("../validations/common");
 const { paginationQuerySchema } = require("../validations/pagination.validation");
 const {
@@ -53,6 +54,7 @@ router.post(
       ...req.body,
       createdBy: req.user.id,
     });
+    await sendAnnouncementNotifications(announcement);
     return res
       .status(201)
       .json({ message: "Announcement created successfully", announcement });

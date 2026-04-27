@@ -3,6 +3,7 @@ const auth = require("../middleware/auth");
 const authorizeRoles = require("../middleware/authorize");
 const validate = require("../middleware/validate");
 const Leave = require("../models/leave");
+const { sendLeaveNotification } = require("../services/notificationService");
 const { z } = require("../validations/common");
 const { paginationQuerySchema } = require("../validations/pagination.validation");
 const {
@@ -132,6 +133,7 @@ router.patch(
       .populate("approvedBy", "-password");
 
     if (!leave) return res.status(404).json({ message: "Leave request not found" });
+    await sendLeaveNotification(leave);
     return res.json({ message: "Leave status updated successfully", leave });
   } catch (error) {
     return next(error);

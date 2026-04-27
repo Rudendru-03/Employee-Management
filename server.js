@@ -24,13 +24,10 @@ app.use((req, res, next) => {
   if (allowedOrigins.includes(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Access-Control-Allow-Credentials", "true");
-    res.header(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization"
-    );
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
     res.header(
       "Access-Control-Allow-Methods",
-      "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     );
   }
 
@@ -44,8 +41,6 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
-connectDB();
 
 app.get("/", (req, res) => {
   res.send("Hello From Employee Management System");
@@ -67,7 +62,20 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
+  console.log(`Server is listening on port ${PORT}`);
   logger.info(`Server is running on port ${PORT}`, {
     environment: process.env.NODE_ENV || "development",
   });
+
+  (async () => {
+    try {
+      await connectDB();
+      require("./services/notificationProcessor");
+    } catch (error) {
+      logger.error("Startup failed", {
+        message: error.message,
+        stack: error.stack,
+      });
+    }
+  })();
 });
