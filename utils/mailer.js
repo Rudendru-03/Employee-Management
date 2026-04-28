@@ -1,6 +1,11 @@
 require("dotenv").config();
 const nodemailer = require("nodemailer");
 
+// sending mail with nodemailer take three steps:
+// 1. create transporter -> configure your smpt server or another supported transport method.
+// 2. Compose your message -> define the sender, recipent, subject and content.
+// 3. send the email -> call transporter.sendMail() with your messages options.
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.ethereal.email",
   port: Number(process.env.SMTP_PORT || 587),
@@ -12,24 +17,53 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendEmail = async (to, subject, text, html) => {
-  try {
-    const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Employee Portal Admin" <admin@employeeportal.com>',
-      to,
-      subject,
-      text,
-      html,
-    });
+  const message = {
+    from:
+      process.env.SMTP_FROM ||
+      '"Employee Portal Admin" <admin@employeeportal.com>',
+    to,
+    subject,
+    text,
+    html,
+  };
 
-    console.log("✅ Email sent successfully to", to);
+  try {
+    await transporter.verify();
+    console.log("Server is ready to take our messages");
+  } catch (err) {
+    console.error("Verification failed:", err);
+    throw err;
+  }
+
+  try {
+    const info = await transporter.sendMail(message);
+    console.log("Message sent:", info.messageId);
+
+    if (info.rejected && info.rejected.length > 0) {
+      console.warn("Some recipients were rejected:", info.rejected);
+    }
+
     if (nodemailer.getTestMessageUrl(info)) {
       console.log("Preview URL:", nodemailer.getTestMessageUrl(info));
     }
 
     return true;
-  } catch (error) {
-    console.error("❌ Error sending email:", error);
-    throw error;
+  } catch (err) {
+    switch (err.code) {
+      case "ECONNECTION":
+      case "ETIMEDOUT":
+        console.error("Network error - retry later:", err.message);
+        break;
+      case "EAUTH":
+        console.error("Authentication failed:", err.message);
+        break;
+      case "EENVELOPE":
+        console.error("Invalid recipients:", err.rejected);
+        break;
+      default:
+        console.error("Send failed:", err.message);
+    }
+    throw err;
   }
 };
 
