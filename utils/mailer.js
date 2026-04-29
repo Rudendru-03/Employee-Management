@@ -1,26 +1,33 @@
 require("dotenv").config();
 const nodemailer = require("nodemailer");
 
-// sending mail with nodemailer take three steps:
-// 1. create transporter -> configure your smpt server or another supported transport method.
-// 2. Compose your message -> define the sender, recipent, subject and content.
-// 3. send the email -> call transporter.sendMail() with your messages options.
-
+// 1. Create transporter -> configure your SMTP server via SendGrid
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.ethereal.email",
+  host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT || 587),
-  secure: process.env.SMTP_SECURE === "true",
+  // secure should be true ONLY if port is 465. For 587, it remains false (using STARTTLS).
+  secure: process.env.SMTP_PORT === "465",
   auth: {
-    user: process.env.SMTP_USER || "wilburn10@ethereal.email",
-    pass: process.env.SMTP_PASS || "5wbfRJCck2uxSB6yFd",
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
 });
 
+// Verify connection ONCE when the server starts, not on every email
+transporter
+  .verify()
+  .then(() => console.log("✅ SendGrid Email Server is ready and verified"))
+  .catch((err) =>
+    console.error(
+      "❌ SendGrid Verification failed. Check API Key:",
+      err.message,
+    ),
+  );
+
 const sendEmail = async (to, subject, text, html) => {
   const message = {
-    from:
-      process.env.SMTP_FROM ||
-      '"Employee Portal Admin" <admin@employeeportal.com>',
+    // Matched to your Render setup
+    from: process.env.FROM_EMAIL,
     to,
     subject,
     text,
@@ -28,27 +35,17 @@ const sendEmail = async (to, subject, text, html) => {
   };
 
   try {
-    await transporter.verify();
-    console.log("Server is ready to take our messages");
-  } catch (err) {
-    console.error("Verification failed:", err);
-    throw err;
-  }
-
-  try {
+    // 3. send the email
     const info = await transporter.sendMail(message);
-    console.log("Message sent:", info.messageId);
+    console.log("✅ Message sent successfully:", info.messageId);
 
     if (info.rejected && info.rejected.length > 0) {
-      console.warn("Some recipients were rejected:", info.rejected);
-    }
-
-    if (nodemailer.getTestMessageUrl(info)) {
-      console.log("Preview URL:", nodemailer.getTestMessageUrl(info));
+      console.warn("⚠️ Some recipients were rejected:", info.rejected);
     }
 
     return true;
   } catch (err) {
+    // Your excellent error handling remains intact
     switch (err.code) {
       case "ECONNECTION":
       case "ETIMEDOUT":
@@ -63,6 +60,7 @@ const sendEmail = async (to, subject, text, html) => {
       default:
         console.error("Send failed:", err.message);
     }
+    // Crucial: Throwing the error ensures BullMQ knows the job failed and will retry it
     throw err;
   }
 };
