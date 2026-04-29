@@ -15,6 +15,8 @@ const logger = require("./utils/logger");
 require("dotenv").config();
 
 const app = express();
+app.set("trust proxy", 1);
+
 const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
   .split(",")
   .map((origin) => origin.trim());
