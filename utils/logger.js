@@ -14,11 +14,14 @@ const logger = createLogger({
   format: format.combine(
     format.errors({ stack: true }),
     format.timestamp(),
-    format.json()
+    format.json(),
   ),
   defaultMeta: { service: "employee-portal" },
   transports: [
-    new transports.File({ filename: path.join(logDir, "error.log"), level: "error" }),
+    new transports.File({
+      filename: path.join(logDir, "error.log"),
+      level: "error",
+    }),
     new transports.File({ filename: path.join(logDir, "combined.log") }),
   ],
   exceptionHandlers: [
@@ -30,21 +33,26 @@ const logger = createLogger({
   exitOnError: false,
 });
 
-if (environment !== "production") {
-  logger.add(
-    new transports.Console({
-      level: "debug",
-      format: format.combine(
-        format.colorize(),
-        format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-        format.printf(({ timestamp, level, message, stack, ...meta }) => {
-          const content = stack || message;
-          const metaString = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : "";
-          return `${timestamp} [${level}]: ${content}${metaString}`;
-        })
-      ),
-    })
-  );
-}
+logger.add(
+  new transports.Console({
+    level: environment === "production" ? "info" : "debug",
+    format:
+      environment === "production"
+        ? // In production, console logs should be JSON for log aggregators (e.g., Datadog, AWS CloudWatch)
+          format.combine(format.timestamp(), format.json())
+        : // In development, console logs should be readable and colored
+          format.combine(
+            format.colorize(),
+            format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+            format.printf(({ timestamp, level, message, stack, ...meta }) => {
+              const content = stack || message;
+              const metaString = Object.keys(meta).length
+                ? ` ${JSON.stringify(meta)}`
+                : "";
+              return `${timestamp} [${level}]: ${content}${metaString}`;
+            }),
+          ),
+  }),
+);
 
 module.exports = logger;

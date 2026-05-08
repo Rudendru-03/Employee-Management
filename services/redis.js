@@ -1,4 +1,5 @@
 const IORedis = require("ioredis");
+const logger = require("../utils/logger");
 require("dotenv").config();
 
 const parseRedisConnectionOptions = () => {
@@ -31,8 +32,8 @@ const parseRedisConnectionOptions = () => {
 
       return options;
     } catch (err) {
-      console.error("❌ Invalid REDIS_URL:", process.env.REDIS_URL);
-      console.error("❌ Redis configuration parse error:", err.message);
+      logger.error("❌ Invalid REDIS_URL:", { url: process.env.REDIS_URL });
+      logger.error("❌ Redis configuration parse error:", { message: err.message });
       process.exit(1);
     }
   }
@@ -49,11 +50,11 @@ const parseRedisConnectionOptions = () => {
 const redisConnection = new IORedis(parseRedisConnectionOptions());
 
 redisConnection.on("connect", () => {
-  console.log("✅ Successfully connected to Redis");
+  logger.info("✅ Successfully connected to Redis");
 });
 
 redisConnection.on("error", (err) => {
-  console.error("❌ Redis connection error:", err.message);
+  logger.error("❌ Redis connection error:", { message: err.message });
 });
 
 module.exports = { redisConnection };

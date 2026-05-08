@@ -2,6 +2,7 @@ const { Worker } = require("bullmq");
 const Notification = require("../models/notification");
 const { redisConnection } = require("./redis");
 const { sendEmail } = require("../utils/mailer");
+const logger = require("../utils/logger");
 
 const queueName = "notificationQueue";
 
@@ -35,7 +36,7 @@ worker.on("failed", async (job, err) => {
 });
 
 worker.on("error", (err) => {
-  console.error("Notification processor error:", err);
+  logger.error("Notification processor error:", { message: err.message });
 });
 
 module.exports = worker;

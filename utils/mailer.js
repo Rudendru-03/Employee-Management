@@ -1,18 +1,19 @@
 require("dotenv").config();
 const sgMail = require("@sendgrid/mail");
+const logger = require("./logger");
 
 const sendgridApiKey = process.env.SENDGRID_API_KEY?.trim();
 const fromEmail = process.env.FROM_EMAIL?.trim();
 
 if (!sendgridApiKey) {
-  console.error(
+  logger.error(
     "❌ Missing SENDGRID_API_KEY. Please set SENDGRID_API_KEY in the environment.",
   );
   process.exit(1);
 }
 
 if (!fromEmail) {
-  console.error(
+  logger.error(
     "❌ Missing FROM_EMAIL. Please set FROM_EMAIL in the environment.",
   );
   process.exit(1);
@@ -31,9 +32,9 @@ const sendEmail = async (to, subject, text, html) => {
 
   try {
     const [response] = await sgMail.send(message);
-    console.log(
+    logger.info(
       "✅ SendGrid Web API message sent:",
-      response.headers?.["x-message-id"] || response.statusCode,
+      { messageId: response.headers?.["x-message-id"] || response.statusCode }
     );
     return true;
   } catch (err) {
@@ -42,7 +43,7 @@ const sendEmail = async (to, subject, text, html) => {
       err.message ||
       String(err);
 
-    console.error("❌ SendGrid Web API send failed:", errorDetails);
+    logger.error("❌ SendGrid Web API send failed:", { error: errorDetails });
     throw err;
   }
 };
