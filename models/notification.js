@@ -1,30 +1,35 @@
-const mongoose = require("mongoose");
-
+// models/notification.js - ADD THESE FIELDS
 const notificationSchema = new mongoose.Schema(
   {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: false,
-    },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     email: { type: String, required: true },
-    type: {
-      type: String,
-      enum: ["leave_approval", "announcement"],
+    type: { 
+      type: String, 
       required: true,
+      enum: ["leave_approval", "announcement", "reminder", "alert"],
     },
     subject: { type: String, required: true },
     body: { type: String, required: true },
     status: {
       type: String,
-      enum: ["queued", "sent", "failed"],
+      enum: ["queued", "retrying", "sent", "failed"],
       default: "queued",
     },
-    sentAt: { type: Date, default: null },
-    error: { type: String, default: null },
-    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+    metadata: { type: Object, default: {} },
+    error: { type: String },
+    sentAt: { type: Date },
+    
+    // NEW FIELDS for better tracking
+    retryCount: { type: Number, default: 0 },
+    lastAttemptAt: { type: Date },
+    externalId: { type: String }, // SendGrid message ID
+    movedToDLQ: { type: Boolean, default: false },
+    failedAt: { type: Date },
+    priority: { type: Number, default: 5 }, // 1-10, lower = higher priority
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
-module.exports = mongoose.model("Notification", notificationSchema);
+notificationSchema.index({ userId: 1, createdAt: -1 });
+notificationSchema.index({ status: 1, createdAt: -1 });
+notificationSchema.index({ type: 1 });

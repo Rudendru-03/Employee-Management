@@ -13,11 +13,13 @@ function createJti() {
   return crypto.randomBytes(16).toString("hex");
 }
 
-function signAccessToken(user) {
+function signAccessToken(user, employee) {
   const payload = {
     id: user._id.toString(),
+    name: user.username,
     email: user.email,
     role: user.role,
+    department: employee,
   };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: ACCESS_TTL });
 }
