@@ -31,10 +31,15 @@ A Node.js-based employee management portal with authentication, employee onboard
   - Create announcements for all, a department, or employees
   - Queue email notifications using Redis and BullMQ
   - Send notification on leave approval and announcements
-- Background queue and retry support
-  - Redis-backed notification queue
-  - Job scheduler and worker processing
-  - Retry on failure with exponential backoff
+  - HTML email templates with dynamic data rendering
+- Background queue and advanced retry system
+  - Redis-backed notification queue using BullMQ
+  - Smart retry logic categorizing errors (network issues, rate limits, 502/503) to trigger exponential backoff
+  - Immediate routing of non-retryable errors to a Dead Letter Queue (DLQ)
+  - DLQ statistics and manual retry support for permanently failed jobs
+  - DB synchronization updating notification status (queued, retrying, sent, failed) and tracking exact errors
+  - High-throughput worker with concurrency settings (10) and strict rate-limiting (max 100 jobs/sec to respect SendGrid limits)
+  - Graceful shutdown for the queue worker to prevent data loss on termination
 - Secure request handling
   - Input validation with Zod
   - Rate limiting for auth endpoints
@@ -48,7 +53,7 @@ A Node.js-based employee management portal with authentication, employee onboard
 4. `services/notificationQueue.js` creates a BullMQ queue and scheduler.
 5. `services/notificationService.js` builds notification payloads for leave and announcement events.
 6. Routes enqueue notifications instead of sending email synchronously.
-7. The worker consumes jobs, sends email via `utils/mailer.js`, and updates notification status in MongoDB.
+7. The worker consumes jobs, sends rich HTML emails via `utils/mailer.js`, and updates the notification status and errors in MongoDB, moving permanently failed jobs to the Dead Letter Queue.
 
 ## Tech Stack
 
@@ -56,7 +61,8 @@ A Node.js-based employee management portal with authentication, employee onboard
 - Express
 - MongoDB with Mongoose
 - Redis with BullMQ
-- Nodemailer for email
+- SendGrid for email delivery
+- Handlebars for email templates
 - Zod input validation
 - Winston logging
 - dotenv for environment variables
@@ -137,8 +143,9 @@ A Node.js-based employee management portal with authentication, employee onboard
 
 - Leave status updates and announcements enqueue notification jobs.
 - Jobs are stored in Redis and processed by a background worker.
-- Emails are sent asynchronously through Nodemailer.
-- Notifications are retried automatically and persisted in the database.
+- Emails are sent asynchronously through SendGrid using branded HTML templates.
+- Notifications are retried automatically with smart error categorization and exponential backoff, syncing retry counts and errors directly to the database.
+- Jobs failing after all retry attempts (or hitting non-retryable errors) are moved to the DLQ for manual inspection and retries.
 
 ## Notes
 
